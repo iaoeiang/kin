@@ -1,0 +1,17 @@
+[Unit]
+Description=Kin Next.js Production Server
+After=network.target
+
+[Service]
+Type=simple
+User=agentuser
+WorkingDirectory=/home/agentuser/agentnet/apps/web/.next/standalone
+ExecStart=/usr/bin/node /home/agentuser/agentnet/apps/web/.next/standalone/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=NEXT_PUBLIC_API_URL=https://kin.cq.cn
+
+[Install]
+WantedBy=multi-user.target

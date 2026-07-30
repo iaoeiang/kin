@@ -1,0 +1,89 @@
+# Kin API — CI/CD Pipeline
+# Runs tests on every push, deploys on main branch
+
+name: Kin CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: agentnet
+          POSTGRES_PASSWORD: changeme_dev_only
+          POSTGRES_DB: agentnet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd apps/agent-api
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run tests
+        run: |
+          export PYTHONPATH=$PWD/apps/agent-api
+          cd apps/agent-api
+          python -m pytest ../../tests/ -v
+        env:
+          DATABASE_URL: postgresql+asyncpg://agentnet:changeme_dev_only@localhost:5432/agentnet
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Lint
+        run: |
+          pip install ruff
+          ruff check apps/agent-api/ --ignore E501
+
+  deploy:
+    needs: [test, lint]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            cd /home/agentuser/agentnet
+            git pull origin main
+            cd apps/agent-api
+            .venv/bin/pip install -r requirements.txt
+            sudo systemctl restart kin-api
+            sudo systemctl restart kin-web

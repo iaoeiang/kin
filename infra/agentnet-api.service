@@ -1,0 +1,16 @@
+[Unit]
+Description=AgentNet API Server
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=agentuser
+WorkingDirectory=/home/agentuser/agentnet/apps/agent-api
+Environment=PYTHONPATH=/home/agentuser/agentnet/apps/agent-api
+EnvironmentFile=/home/agentuser/agentnet/apps/agent-api/.env
+ExecStart=/home/agentuser/agentnet/apps/agent-api/.venv/bin/uvicorn agentnet.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
