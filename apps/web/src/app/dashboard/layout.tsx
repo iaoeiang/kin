@@ -33,14 +33,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div style={{ minHeight: '100vh', background: '#030712', color: '#f3f4f6', display: 'flex' }}>
       {/* Sidebar */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-60 bg-gray-900 border-r border-gray-800 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-        <div className="p-4 border-b border-gray-800">
-          <h1 className="text-lg font-bold">⚡ Kin</h1>
-          <p className="text-xs text-gray-500 truncate mt-1">{email}</p>
+      <aside style={{ width: '240px', minWidth: '240px', background: '#111827', borderRight: '1px solid #1f2937', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid #1f2937' }}>
+          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>⚡ Kin</div>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
         </div>
-        <nav className="p-2 space-y-1">
+        <nav style={{ padding: '8px' }}>
           {NAV_ITEMS.map(item => {
             const active = pathname === item.href
             return (
@@ -48,45 +48,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`block px-3 py-2 rounded-lg text-sm transition-colors ${active ? 'bg-blue-600 text-white' : 'hover:bg-gray-800 text-gray-300'}`}
+                style={{
+                  display: 'block',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  textDecoration: 'none',
+                  background: active ? '#2563eb' : 'transparent',
+                  color: active ? '#fff' : '#d1d5db',
+                }}
               >
                 {lang === 'zh' && item.label !== '🤖 Agents' ? item.label : item.labelEn}
               </Link>
             )
           })}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-              className="text-xs px-2 py-1 bg-gray-800 rounded hover:bg-gray-700"
-            >
+        <div style={{ marginTop: 'auto', padding: '16px', borderTop: '1px solid #1f2937' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} style={{ fontSize: '12px', padding: '4px 8px', background: '#1f2937', borderRadius: '4px', border: 'none', color: '#d1d5db', cursor: 'pointer' }}>
               {lang === 'zh' ? 'EN' : '中文'}
             </button>
-            <button onClick={logout} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">
+            <button onClick={logout} style={{ fontSize: '12px', color: '#f87171', padding: '4px 8px', border: 'none', background: 'transparent', cursor: 'pointer' }}>
               {lang === 'zh' ? '退出' : 'Logout'}
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="md:hidden flex items-center justify-between p-3 border-b border-gray-800">
-          <button onClick={() => setSidebarOpen(true)} className="text-xl">☰</button>
-          <span className="text-sm font-medium">Kin</span>
-          <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} className="text-xs px-2 py-1 bg-gray-800 rounded">
-            {lang === 'zh' ? 'EN' : '中文'}
-          </button>
-        </div>
-        <div className="p-4 md:p-6 max-w-6xl mx-auto">
-          {children}
-        </div>
+      <main style={{ flex: 1, overflow: 'auto', padding: '24px', maxWidth: '1200px' }}>
+        {children}
       </main>
     </div>
   )

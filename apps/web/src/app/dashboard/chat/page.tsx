@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { apiFetch, API } from '../../../lib/auth'
+import { apiFetch } from '../../../lib/auth'
 
 interface Conversation { id: string; title: string; others: { user_id: string; name: string }[]; created_at: string }
 
@@ -11,10 +11,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([])
   const [msgBody, setMsgBody] = useState('')
   const [loading, setLoading] = useState(true)
-  const [unread, setUnread] = useState<Record<string, number>>({})
   const chatEndRef = useRef<HTMLDivElement>(null)
-  const wsRef = useRef<WebSocket | null>(null)
-  const currentUserId = useRef('')
 
   useEffect(() => {
     apiFetch('/api/conversations').then(r => {
@@ -22,54 +19,6 @@ export default function ChatPage() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
-
-  // ── WebSocket connection for real-time messages ──
-  useEffect(() => {
-    const stored = localStorage.getItem('agentnet_auth')
-    if (!stored) return
-    const { token, userId } = JSON.parse(stored)
-    currentUserId.current = userId
-
-    const connect = () => {
-      const ws = new WebSocket(`${API.replace('http', 'ws')}/ws`)
-      ws.onopen = () => ws.send(JSON.stringify({ token }))
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          if (data.type === 'new_message') {
-            // Reload conversations to update order
-            apiFetch('/api/conversations').then(r => setConversations(r.conversations || []))
-            // If we're in the conversation that received the message, reload messages
-            if (chatConv === data.conversation_id) {
-              apiFetch(`/api/conversations/${chatConv}/messages`)
-                .then(m => setMessages(m.messages || []))
-                .catch(() => {})
-            } else {
-              // Track unread
-              setUnread(prev => ({ ...prev, [data.conversation_id]: (prev[data.conversation_id] || 0) + 1 }))
-              // Browser notification
-              if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-                new Notification(`💬 ${data.sender_name || 'New message'}`, {
-                  body: data.body,
-                  icon: '/favicon.ico',
-                })
-              }
-            }
-          }
-        } catch {}
-      }
-      ws.onclose = () => setTimeout(connect, 3000) // reconnect
-      wsRef.current = ws
-    }
-
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-
-    connect()
-    return () => { wsRef.current?.close() }
-  }, [chatConv])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -93,35 +42,6 @@ export default function ChatPage() {
     } catch {}
   }
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-
-  const sendFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !chatConv) return
-    setUploading(true)
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      const upload = await fetch(`${API}/api/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${JSON.parse(localStorage.getItem('agentnet_auth') || '{}').token}` },
-        body: form,
-      })
-      const uploadData = await upload.json()
-      if (uploadData.status === 'ok') {
-        await apiFetch('/api/messages', {
-          method: 'POST',
-          body: JSON.stringify({ conversation_id: chatConv, body: uploadData.url, content_type: 'image' }),
-        })
-        const m = await apiFetch(`/api/conversations/${chatConv}/messages`)
-        setMessages(m.messages || [])
-      }
-    } catch {}
-    setUploading(false)
-    e.target.value = ''
-  }
-
   if (loading) return <div className="text-gray-500 text-center py-12">加载中...</div>
 
   const currentConv = conversations.find(c => c.id === chatConv)
@@ -137,15 +57,10 @@ export default function ChatPage() {
           {conversations.map(c => (
             <button
               key={c.id}
-              onClick={() => { loadChat(c.id); setUnread(prev => ({...prev, [c.id]: 0})) }}
+              onClick={() => loadChat(c.id)}
               className={`block w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800/50 transition-colors ${chatConv === c.id ? 'bg-blue-900/20 border-l-2 border-l-blue-500' : ''}`}
             >
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-sm truncate">{c.title || '未命名会话'}</div>
-                {unread[c.id] > 0 && (
-                  <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{unread[c.id]}</span>
-                )}
-              </div>
+              <div className="font-medium text-sm truncate">{c.title || '未命名会话'}</div>
               <div className="text-xs text-gray-500 mt-0.5">
                 {c.others?.map(o => o.name).join(', ') || '无其他成员'}
               </div>
@@ -179,11 +94,7 @@ export default function ChatPage() {
                   <div key={m.id} className={`flex ${isYou ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${isYou ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-100 rounded-bl-sm'}`}>
                       {!isYou && <div className="text-xs text-gray-400 mb-1">{m.sender_user_id.slice(-8)}</div>}
-                      {m.content_type === 'image' ? (
-                        <img src={m.body} alt="uploaded" className="max-w-full rounded-lg max-h-48 object-cover" />
-                      ) : (
-                        <div>{m.body}</div>
-                      )}
+                      <div>{m.body}</div>
                       <div className="text-xs text-gray-400 mt-1 text-right">
                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
@@ -197,15 +108,6 @@ export default function ChatPage() {
             {/* Input */}
             <div className="p-4 border-t border-gray-800">
               <div className="flex gap-2">
-                <input type="file" ref={fileInputRef} onChange={sendFile} className="hidden" accept="image/*,application/pdf" />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="px-3 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm disabled:opacity-50"
-                  title="上传文件"
-                >
-                  {uploading ? '⏳' : '📎'}
-                </button>
                 <input
                   value={msgBody}
                   onChange={e => setMsgBody(e.target.value)}
